@@ -1,0 +1,100 @@
+using System;
+using System.Diagnostics;
+using System.Threading.Tasks;
+
+class Program
+{
+    class ServerResponse
+    {
+        public bool IsSuccess;
+        public string Json;
+        public string ErrorText;
+    }
+    static async Task Main()
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
+        Task<ServerResponse> task1 = GetServerResponseAsync(1);
+        Task<ServerResponse> task2 = GetServerResponseAsync(2);
+        Task<ServerResponse> task3 = GetServerResponseAsync(3);
+
+        ServerResponse[] responses = await Task.WhenAll(task1, task2, task3);
+
+        for(int i=0; i< responses.Length; i++)
+        {
+            int serverNumber = i + 1;
+            ServerResponse response = responses[i]; ;
+
+            if (!response.IsSuccess)
+            {
+                stopwatch.Stop();
+                Console.WriteLine("Error of server " + serverNumber + ": " + response.ErrorText);
+                Console.WriteLine("Lead time before error: " + stopwatch.Elapsed);
+                return;
+            }
+            Console.WriteLine("Message from server " + serverNumber + ":");
+            Console.WriteLine(response.Json);
+            Console.WriteLine();
+        }
+        stopwatch.Stop();
+        Console.WriteLine("Lead time: " + stopwatch.Elapsed);
+    }
+
+    static async Task<ServerResponse> GetServerResponseAsync(int serverNumber)
+    {
+        await Task.Delay(1000); //искусственное ожидание от сервера
+
+        if(serverNumber == 1)
+        {
+            return new ServerResponse
+            {
+                IsSuccess = true,
+                Json = "{\"server\":\"server1\",\"message\":\"Hello from first server\",\"value\":100}",
+                ErrorText = ""
+            };
+        }
+
+        if (serverNumber == 2)
+        {
+            return new ServerResponse
+            {
+                IsSuccess = true,
+                Json = "{\"server\":\"server2\",\"message\":\"Hello from second server\",\"value\":200}",
+                ErrorText = ""
+            };
+        }
+
+        if (serverNumber == 3)
+        {
+            return new ServerResponse
+            {
+                IsSuccess = false,
+                Json = "",
+                ErrorText = "Server is unavailable"
+            };
+        }
+
+        return new ServerResponse
+        {
+            IsSuccess = false,
+            Json = "",
+            ErrorText = "Server is not found"
+        };
+    }
+
+    static bool PrintResponseOrError(int serverNumber, ServerResponse response, Stopwatch stopwatch)
+    {
+        if (!response.IsSuccess)
+        {
+            stopwatch.Stop();
+            Console.WriteLine("Error of server " + serverNumber + ": " + response.ErrorText);
+            Console.WriteLine("Lead time before error: " + stopwatch.Elapsed);
+            return false;
+        }
+
+        Console.WriteLine("Message from server " + serverNumber + ": ");
+        Console.WriteLine(response.Json);
+        Console.WriteLine();
+        return true;
+    }
+}
