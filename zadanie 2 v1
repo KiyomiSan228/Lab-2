@@ -1,0 +1,84 @@
+using System;
+using System.Diagnostics;
+
+class Program
+{
+    class ServerResponse
+    {
+        public bool IsSuccess;
+        public string Json;
+        public string ErrorText;
+    }
+    static void Main()
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
+        ServerResponse response1 = GetServerResponse(1);
+        if (!PrintResponseOrError(1, response1, stopwatch)) return;
+
+        ServerResponse response2 = GetServerResponse(2);
+        if (!PrintResponseOrError(2, response2, stopwatch)) return;
+
+        ServerResponse response3 = GetServerResponse(3);
+        if (!PrintResponseOrError(3, response3, stopwatch)) return;
+
+        stopwatch.Stop();
+        Console.WriteLine("Lead time: " + stopwatch.Elapsed);
+    }
+
+    static ServerResponse GetServerResponse(int serverNumber)
+    {
+        if(serverNumber == 1)
+        {
+            return new ServerResponse
+            {
+                IsSuccess = true,
+                Json = "{\"server\":\"server1\",\"message\":\"Hello from first server\",\"value\":100}",
+                ErrorText = ""
+            };
+        }
+
+        if (serverNumber == 2)
+        {
+            return new ServerResponse
+            {
+                IsSuccess = true,
+                Json = "{\"server\":\"server2\",\"message\":\"Hello from second server\",\"value\":200}",
+                ErrorText = ""
+            };
+        }
+
+        if (serverNumber == 3)
+        {
+            return new ServerResponse
+            {
+                IsSuccess = false,
+                Json = "",
+                ErrorText = "Server is unavailable"
+            };
+        }
+
+        return new ServerResponse
+        {
+            IsSuccess = false,
+            Json = "",
+            ErrorText = "Server is not found"
+        };
+    }
+
+    static bool PrintResponseOrError(int serverNumber, ServerResponse response, Stopwatch stopwatch)
+    {
+        if (!response.IsSuccess)
+        {
+            stopwatch.Stop();
+            Console.WriteLine("Error of server " + serverNumber + ": " + response.ErrorText);
+            Console.WriteLine("Lead time before error: " + stopwatch.Elapsed);
+            return false;
+        }
+
+        Console.WriteLine("Message from server " + serverNumber + ": ");
+        Console.WriteLine(response.Json);
+        Console.WriteLine();
+        return true;
+    }
+}
