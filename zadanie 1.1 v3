@@ -1,0 +1,74 @@
+using System;
+using System.Diagnostics;
+using System.Threading;
+
+class Program
+{
+    private const int MaxNumber = 10000;
+    private const int ThreadCount = 4;
+    private static int primeCount = 0;
+    private static readonly Semaphore counterSemaphore = new Semaphore(1, 1);
+
+    static void Main()
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        Thread[] threads = new Thread[ThreadCount];
+        int numbersPerThread = MaxNumber / ThreadCount;
+
+        for (int i = 0; i < ThreadCount; i++)
+        {
+            int startNumber = i * numbersPerThread + 1;
+            int endNumber = ((i == ThreadCount - 1) ? MaxNumber : startNumber + numbersPerThread - 1);
+            int threadNumber = i + 1;
+            Thread thread = new Thread(() => CheckNumbers(threadNumber, startNumber, endNumber));
+            threads[i] = thread;
+            thread.Start();
+        }
+
+        for (int i = 0; i < ThreadCount; i++)
+        {
+            threads[i].Join();
+        }
+
+        stopwatch.Stop();
+        Console.WriteLine("Total number of prime numbers: " + primeCount);
+        Console.WriteLine("Lead time: " + stopwatch.Elapsed);
+        counterSemaphore.Dispose();
+    }
+    private static void CheckNumbers(int threadNumber, int startNumber, int endNumber)
+    {
+        for (int number = startNumber; number <= endNumber; number++)
+        {
+            Console.WriteLine("Thread " + threadNumber + " is checking " + number + ".");
+            if (IsPrime(number))
+            {
+                Console.WriteLine("Thread " + threadNumber + " found prime number " + number + ".");
+                counterSemaphore.WaitOne();
+                try
+                {
+                    primeCount++;
+                }
+                finally
+                {
+                    counterSemaphore.Release();
+                }
+            }
+        }
+    }
+    private static bool IsPrime(int number)
+    {
+        if (number < 2)
+        {
+            return false;
+        }
+
+        for (int c = 2; c * c <= number; c++)
+        {
+            if (number % c == 0)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
