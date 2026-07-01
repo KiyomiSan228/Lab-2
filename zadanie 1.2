@@ -1,0 +1,145 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.Contracts;
+using System.IO;
+using System.Threading;
+
+class Program
+{
+    private const int SetCount = 15;
+    private const int NumbersInSet = 100;
+    private const int MinNumber = 1;
+    private const int MaxNumber = 100;
+    private const int MaxParallelThreads = 3; //n
+    private const string DataFileName = "number_sets.txt";
+    private static readonly object logLock = new object();
+    private static readonly Mutex totalMutex = new Mutex();
+    private static readonly Semaphore workSemaphore = new Semaphore(MaxParallelThreads, MaxParallelThreads);
+    private static readonly List<Result> results = new List<Result>();
+    private static int totalSum = 0;
+
+    private class Result
+    {
+        public int SetNumber;
+        public int Sum;
+        public int ThreadID;
+    }
+    static void Main()
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        int[][] sets = LoadOrCreateSets();
+        Thread[] threads = new Thread[SetCount];
+
+        for(int i=0; i< SetCount; i++)
+        {
+            int setNumber = i + 1;
+            int[] numbers = sets[i];
+            Thread thread = new Thread(() => ProcessSet(setNumber, numbers));
+            threads[i] = thread;
+            thread.Start();
+        }
+
+        for(int i = 0; i<SetCount; i++)
+        {
+            threads[i].Join();
+        }
+
+        stopwatch.Stop();
+        results.Sort((left, right) => left.SetNumber.CompareTo(right.SetNumber));
+        Console.WriteLine("Summary of set:");
+        for(int i=0;i< results.Count; i++)
+        {
+            Result result = results[i];
+            Console.WriteLine("Set " + result.SetNumber + ": sum = " + result.Sum + ", thread = " + result.ThreadID);
+        }
+
+        Console.WriteLine("Overall total for all sets: " + totalSum);
+        Console.WriteLine("Lead time: " + stopwatch.Elapsed);
+        workSemaphore.Dispose();
+        totalMutex.Dispose();
+    }
+
+    private static int[][] LoadOrCreateSets()
+    {
+        if (!File.Exists(DataFileName))
+        {
+            CreateDataFile();
+        }
+
+        string[] lines = File.ReadAllLines(DataFileName);
+        if(lines.Length != SetCount)
+        {
+            throw new InvalidOperationException("In file must be " +  SetCount + " sets.");
+        }
+
+        int[][] sets = new int[SetCount][];
+        for(int i=0; i<SetCount;i++)
+        {
+            string[] parts = lines[i].Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if(parts.Length != NumbersInSet)
+            {
+                throw new InvalidOperationException("In set " + (i + 1) + " must be " + NumbersInSet + " numbers");
+            }
+
+            int[] numbers=new int[NumbersInSet];
+            for(int j=0; j<NumbersInSet; j++)
+            {
+                numbers[j] = int.Parse(parts[j]);
+            }
+
+            sets[i] = numbers;
+        }
+        return sets;
+    }
+    private static void CreateDataFile()
+    {
+        Random random = new Random();
+        using (StreamWriter writer = new StreamWriter(DataFileName))
+        {
+            for(int i=0; i < SetCount; i++)
+            {
+                string[] numbers = new string[NumbersInSet];
+                for(int j=0;j<NumbersInSet; j++)
+                {
+                    numbers[j] = random.Next(MinNumber, MaxNumber+1).ToString();
+                }
+                writer.WriteLine(string.Join(" ", numbers));
+            }
+        }
+
+    }
+
+    private static void ProcessSet(int setNumber, int[] numbers)
+    {
+        int sum = 0;
+        workSemaphore.WaitOne();
+        try
+        {
+            for(int i=0; i< numbers.Length; i++)
+            {
+                sum += numbers[i];
+            }
+        }
+        finally
+        {
+            workSemaphore.Release();
+        }
+
+        int threadID = Thread.CurrentThread.ManagedThreadId;
+        lock (logLock)
+        {
+            results.Add(new Result { SetNumber = setNumber, Sum = sum, ThreadID = threadID });
+        }
+
+        totalMutex.WaitOne();
+        try
+        {
+            totalSum += sum;
+        }
+        finally
+        {
+            totalMutex.ReleaseMutex();
+        }
+    }
+}
